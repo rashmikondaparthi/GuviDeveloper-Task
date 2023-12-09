@@ -1,53 +1,79 @@
 <?php
-session_start();
 
-if (isset($_SESSION['username'])) {
-	header("Location: ../profile.html");
-	exit;
+$DATABASE_HOST = 'localhost';
+$DATABASE_USER = 'root';
+$DATABASE_PASS = '';
+$DATABASE_NAME = 'users';
+
+$con = mysqli_connect(
+    $DATABASE_HOST,
+    $DATABASE_USER,
+    $DATABASE_PASS,
+    $DATABASE_NAME
+);
+
+if(mysqli_connect_error())
+{
+    exit('Error connecting to the database: ' . mysqli_connect_error());
 }
 
-if (isset($_POST['username']) && isset($_POST['password'])) {
-
-	$conn = mysqli_connect('localhost', 'root', '', 'GuviTask');
-
-	if (!$conn) {
-		die('Error: Could not connect to database');
-	}
-
-	$stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE uname = ? AND pswd = ?");
-
-	mysqli_stmt_bind_param($stmt, "ss", $_POST['username'], $_POST['password']);
-
-	mysqli_stmt_execute($stmt);
-
-	$result = mysqli_stmt_get_result($stmt);
-	if (mysqli_num_rows($result) > 0) {
-		$_SESSION['username'] = $_POST['username'];
-		header("Location: ../profile.html");
-		exit;
-
-	} else {
-
-	
-		echo "Invalid username or password";
-
-	}
-	mysqli_close($conn);
+if(!isset($_POST['email'], $_POST['password']))
+{
+    exit("Empty Fields");
 }
-?>
 
-<?php
-  session_start();
-  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$email = $_POST['email'];
+$password = $_POST['password'];
 
-    if ($authenticated) {
-      $_SESSION['username'] = $username;
+if(empty($email) || empty($password))
+{
+    exit("Empty values");
+}
 
-      $_SESSION['expires'] = time() + 1800; 
-      header('Location: /profile.php');
-      exit;
-    } else {
-      echo "Error";
+if($stmt = $con->prepare('SELECT id, firstName, lastName, email,phone, dateOfBirth, gender, bio, password FROM usertable WHERE email = ?'))
+{
+    $stmt->bind_param('s', $email);
+    $stmt->execute();
+    $stmt->store_result();
+
+    if($stmt->num_rows > 0)
+    {
+        $stmt->bind_result($id, $firstName, $lastName, $email,$phone, $dateOfBirth, $gender, $bio, $hashed_password);
+        $stmt->fetch();
+
+        if(password_verify($password, $hashed_password))
+        {
+            $userDetails = array(
+                'id' => $id,
+                'firstName' => $firstName,
+                'lastName' => $lastName,
+                'email' => $email,
+                'phone'=>$phone,
+                'dateOfBirth' => $dateOfBirth,
+                'gender' => $gender,
+                'bio' => $bio
+            );
+
+            header('Content-Type: application/json');
+            echo json_encode($userDetails);
+        }
+        else
+        {
+            echo 'Incorrect password';
+        }
     }
-  }
+    else
+    {
+        echo 'User not found';
+    }
+
+    $stmt->close();
+}
+else
+{
+    echo 'Error Occurred';
+}
+
+$con->close();
+
 ?>
